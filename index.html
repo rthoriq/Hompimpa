@@ -1,39 +1,782 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <title>Realtime Object Detection Praktikum</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <title>Deteksi Objek Realtime – CV Praktikum Hompimpa</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <link rel="stylesheet" href="./style.css">
+  <style>
+    :root {
+      --bg: #020617;
+      --card: #0f172a;
+      --accent: #22c55e;
+      --accent-soft: rgba(34, 197, 94, 0.15);
+      --danger: #ef4444;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #111827 0, #020617 55%, #000 100%);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1100px;
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.98));
+      border-radius: 18px;
+      padding: 18px 20px 20px;
+      box-shadow:
+        0 24px 60px rgba(15, 23, 42, 0.9),
+        0 0 0 1px rgba(148, 163, 184, 0.12);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        display: block;
+      }
+
+      .right {
+        margin-top: 14px;
+      }
+    }
+
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    header h1 {
+      font-size: 20px;
+      margin: 0 0 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header h1 span.badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.14);
+      border: 1px solid rgba(34, 197, 94, 0.5);
+      color: #bbf7d0;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    header p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .api-url {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .api-url code {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 11px;
+      color: #e5e7eb;
+    }
+
+    .left {
+      background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.08), transparent 60%),
+                  radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.08), transparent 55%);
+      border-radius: 14px;
+      padding: 12px;
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .video-wrapper {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid rgba(15, 23, 42, 0.9);
+      aspect-ratio: 16 / 9;
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* supaya wajah memenuhi frame, tidak hitam di samping */
+      background: #000;
+    }
+
+    #overlayCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.16s ease;
+      font-weight: 500;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: #022c22;
+      box-shadow: 0 12px 20px rgba(22, 163, 74, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 26px rgba(22, 163, 74, 0.55);
+    }
+
+    .btn-secondary {
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px dashed rgba(148, 163, 184, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .status-pill {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: var(--muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #64748b;
+    }
+
+    .status-dot.live {
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.3);
+    }
+
+    .right {
+      background: radial-gradient(circle at top right, rgba(34, 197, 94, 0.08), transparent 60%);
+      border-radius: 14px;
+      padding: 14px;
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .summary {
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 12px;
+      padding: 8px 10px;
+      border: 1px solid rgba(30, 64, 175, 0.7);
+    }
+
+    .summary strong {
+      color: #e5e7eb;
+    }
+
+    .detection-list {
+      flex: 1;
+      min-height: 120px;
+      max-height: 240px;
+      overflow: auto;
+      margin-top: 4px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(51, 65, 85, 0.9);
+      padding: 6px 0;
+    }
+
+    .det-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+    }
+
+    .det-row:last-child {
+      border-bottom: none;
+    }
+
+    .det-class {
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .det-conf {
+      font-variant-numeric: tabular-nums;
+      color: #bbf7d0;
+    }
+
+    .det-box {
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 18px 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .error {
+      font-size: 12px;
+      color: #fecaca;
+      background: rgba(127, 29, 29, 0.5);
+      border: 1px solid rgba(248, 113, 113, 0.8);
+      padding: 6px 10px;
+      border-radius: 10px;
+      margin-top: 4px;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+  </style>
 </head>
 <body>
+<div class="app">
   <header>
-    <h1>Realtime Object Detection – Praktikum Computer Vision</h1>
-    <p>Backend: Hugging Face Spaces • Frontend: Vercel</p>
+    <div>
+      <h1>
+        Praktikum Hompimpa
+        <span class="badge">YOLOv8 + FastAPI</span>
+      </h1>
+      <p>Deteksi objek realtime dari kamera dan kirim ke API HuggingFace.</p>
+    </div>
+    <div class="api-url">
+      API
+      <code>POST https://moordgg-hompimpaa.hf.space/predict</code>
+    </div>
   </header>
 
-  <main>
-    <section class="camera-section">
-      <div class="video-wrapper">
-        <video id="video" autoplay muted playsinline></video>
-        <canvas id="overlay"></canvas>
+  <div class="left">
+    <div class="video-wrapper">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlayCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+      <div class="btn-row">
+        <button id="btnCamera" class="btn-primary">🎥 Nyalakan Kamera</button>
+        <button id="btnDetect" class="btn-secondary" disabled>🔍 Deteksi Sekarang</button>
+        <button id="btnFrontCam" class="btn-ghost" disabled>📱 Kamera Depan</button>
+        <button id="btnBackCam" class="btn-ghost" disabled>📷 Kamera Belakang</button>
       </div>
-
-      <div class="controls">
-        <button id="btnStartCamera">Start Kamera</button>
-        <button id="btnCapture" disabled>Capture & Deteksi</button>
+      <div class="status-pill">
+        <span id="statusDot" class="status-dot"></span>
+        <span id="statusText">Kamera belum aktif</span>
       </div>
+    </div>
 
-      <div id="status"></div>
-    </section>
+    <p class="hint">
+      Laptop: pakai webcam bawaan.<br />
+      HP: pilih <strong>Kamera Depan</strong> atau <strong>Kamera Belakang</strong> untuk ganti kamera.
+    </p>
 
-    <section class="result-section">
-      <h2>Hasil Deteksi</h2>
-      <pre id="rawJson"></pre>
-    </section>
-  </main>
+    <div id="errorBox" class="error" style="display:none;"></div>
+  </div>
 
-  <script src="./main.js"></script>
+  <div class="right">
+    <div>
+      <div class="panel-title">
+        <span>Hasil Deteksi</span>
+        <span style="font-size:11px; color:var(--muted);" id="lastTime">–</span>
+      </div>
+      <div id="summary" class="summary">
+        Belum ada deteksi. Ambil satu frame dari kamera untuk melihat hasil.
+      </div>
+    </div>
+
+    <div class="detection-list" id="detList">
+      <div class="empty-state">
+        Tidak ada data deteksi.<br />
+        Tekan <strong>Deteksi Sekarang</strong> untuk mengirim satu frame ke server.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_URL = "https://moordgg-hompimpaa.hf.space/predict";
+
+  const video = document.getElementById("video");
+  const overlayCanvas = document.getElementById("overlayCanvas");
+  const ctxOverlay = overlayCanvas.getContext("2d");
+
+  const btnCamera = document.getElementById("btnCamera");
+  const btnDetect = document.getElementById("btnDetect");
+  const btnFrontCam = document.getElementById("btnFrontCam");
+  const btnBackCam = document.getElementById("btnBackCam");
+  const statusDot = document.getElementById("statusDot");
+  const statusText = document.getElementById("statusText");
+  const errorBox = document.getElementById("errorBox");
+  const summaryBox = document.getElementById("summary");
+  const detList = document.getElementById("detList");
+  const lastTime = document.getElementById("lastTime");
+
+  let stream = null;
+  let cameraOn = false;
+  let busy = false;
+
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  // daftar device kamera
+  let videoDevices = [];
+  let frontDeviceId = null;
+  let backDeviceId = null;
+  let currentDeviceId = null;
+
+  function setStatus({ live = false, text = "" }) {
+    statusDot.classList.toggle("live", live);
+    statusText.textContent = text;
+  }
+
+  function setError(msg) {
+    if (!msg) {
+      errorBox.style.display = "none";
+      errorBox.textContent = "";
+    } else {
+      errorBox.style.display = "block";
+      errorBox.textContent = msg;
+    }
+  }
+
+  function resizeOverlayToVideo() {
+    if (!video.videoWidth || !video.videoHeight) return;
+
+    overlayCanvas.width = video.videoWidth;
+    overlayCanvas.height = video.videoHeight;
+
+    const wrapper = video.parentElement.getBoundingClientRect();
+    overlayCanvas.style.width = wrapper.width + "px";
+    overlayCanvas.style.height = wrapper.height + "px";
+  }
+
+  async function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    cameraOn = false;
+    video.srcObject = null;
+    ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  }
+
+  async function discoverVideoDevices() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      videoDevices = devices.filter(d => d.kind === "videoinput");
+
+      if (!videoDevices.length) return;
+
+      // reset
+      frontDeviceId = null;
+      backDeviceId = null;
+
+      videoDevices.forEach(d => {
+        const label = (d.label || "").toLowerCase();
+        if (!frontDeviceId && /front|user|face|selfie/.test(label)) {
+          frontDeviceId = d.deviceId;
+        }
+        if (!backDeviceId && /back|rear|environment|world/.test(label)) {
+          backDeviceId = d.deviceId;
+        }
+      });
+
+      // fallback: kalau tidak kebaca labelnya
+      if (!frontDeviceId && videoDevices[0]) {
+        frontDeviceId = videoDevices[0].deviceId;
+      }
+      if (!backDeviceId && videoDevices[1]) {
+        backDeviceId = videoDevices[1].deviceId;
+      }
+      if (!backDeviceId) backDeviceId = frontDeviceId;
+
+      // aktifkan tombol sesuai ketersediaan
+      btnFrontCam.disabled = !frontDeviceId;
+      btnBackCam.disabled = !backDeviceId || backDeviceId === frontDeviceId;
+    } catch (err) {
+      console.warn("Gagal enumerateDevices:", err);
+    }
+  }
+
+  function buildConstraints(deviceIdPreference) {
+    // kalau deviceId diketahui, gunakan itu (pasti tepat ke kamera yg diinginkan)
+    if (deviceIdPreference) {
+      return {
+        audio: false,
+        video: {
+          deviceId: { exact: deviceIdPreference },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+    }
+
+    // default: laptop pakai webcam "user"
+    if (!isMobile) {
+      return {
+        audio: false,
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
+    }
+
+    // mobile: coba environment dulu, kalau gagal nanti fallback
+    return {
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    };
+  }
+
+  async function startCamera(deviceIdPreference = null) {
+    setError("");
+
+    if (cameraOn && !deviceIdPreference) {
+      // tombol besar: matikan kamera
+      await stopCamera();
+      btnCamera.textContent = "🎥 Nyalakan Kamera";
+      btnDetect.disabled = true;
+      setStatus({ live: false, text: "Kamera dimatikan" });
+      return;
+    }
+
+    try {
+      btnCamera.disabled = true;
+      btnCamera.textContent = "Mengaktifkan kamera...";
+
+      // stop stream lama kalau ada
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+
+      let constraints = buildConstraints(deviceIdPreference);
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        // fallback khusus HP: kalau environment gagal, coba user
+        if (!deviceIdPreference && isMobile) {
+          console.warn("Gagal kamera environment, coba user:", err);
+          constraints = {
+            audio: false,
+            video: {
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } else {
+          throw err;
+        }
+      }
+
+      video.srcObject = stream;
+      video.setAttribute("playsinline", "true");
+
+      await new Promise(resolve => {
+        video.onloadedmetadata = () => {
+          video.play().then(resolve).catch(resolve);
+        };
+      });
+
+      resizeOverlayToVideo();
+      cameraOn = true;
+      btnCamera.textContent = "⏹ Matikan Kamera";
+      btnDetect.disabled = false;
+
+      // simpan deviceId aktif
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        const settings = videoTrack.getSettings();
+        currentDeviceId = settings.deviceId || null;
+      }
+
+      // setelah dapat izin, enumerate device untuk bedakan depan/belakang
+      await discoverVideoDevices();
+
+      setStatus({ live: true, text: "Kamera aktif – siap deteksi" });
+    } catch (err) {
+      console.error(err);
+      setError("Gagal mengakses kamera. Pastikan izin kamera sudah diberikan di browser.");
+      setStatus({ live: false, text: "Kamera gagal diaktifkan" });
+      cameraOn = false;
+    } finally {
+      btnCamera.disabled = false;
+    }
+  }
+
+  async function useFrontCamera() {
+    if (!frontDeviceId) {
+      setError("Kamera depan tidak terdeteksi di perangkat ini.");
+      return;
+    }
+    await startCamera(frontDeviceId);
+    setStatus({ live: true, text: "Kamera depan aktif" });
+  }
+
+  async function useBackCamera() {
+    if (!backDeviceId) {
+      setError("Kamera belakang tidak terdeteksi di perangkat ini.");
+      return;
+    }
+    await startCamera(backDeviceId);
+    setStatus({ live: true, text: "Kamera belakang aktif" });
+  }
+
+  async function captureAndDetect() {
+    if (!cameraOn || busy) return;
+    busy = true;
+    setError("");
+    btnDetect.disabled = true;
+    btnDetect.textContent = "Memproses...";
+    setStatus({ live: true, text: "Mengirim frame ke server..." });
+
+    try {
+      const captureCanvas = document.createElement("canvas");
+      const cctx = captureCanvas.getContext("2d");
+
+      const vw = video.videoWidth || 640;
+      const vh = video.videoHeight || 480;
+      captureCanvas.width = vw;
+      captureCanvas.height = vh;
+      cctx.drawImage(video, 0, 0, vw, vh);
+
+      const blob = await new Promise(resolve =>
+        captureCanvas.toBlob(resolve, "image/jpeg", 0.9)
+      );
+
+      const form = new FormData();
+      form.append("file", blob, "frame.jpg");
+
+      const t0 = performance.now();
+      const resp = await fetch(API_URL, {
+        method: "POST",
+        body: form
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error("Server error " + resp.status + " – " + text);
+      }
+
+      const data = await resp.json();
+      const t1 = performance.now();
+      renderDetections(data, t1 - t0, vw, vh);
+    } catch (err) {
+      console.error(err);
+      setError("Gagal melakukan deteksi: " + err.message);
+      setStatus({ live: cameraOn, text: "Terjadi kesalahan saat deteksi" });
+    } finally {
+      busy = false;
+      btnDetect.disabled = !cameraOn;
+      btnDetect.textContent = "🔍 Deteksi Sekarang";
+    }
+  }
+
+  function renderDetections(result, latencyMs, frameW, frameH) {
+    const dets = result?.detections || [];
+    const w = result?.width || frameW;
+    const h = result?.height || frameH;
+
+    overlayCanvas.width = w;
+    overlayCanvas.height = h;
+
+    const wrapper = video.parentElement.getBoundingClientRect();
+    overlayCanvas.style.width = wrapper.width + "px";
+    overlayCanvas.style.height = wrapper.height + "px";
+
+    ctxOverlay.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+    if (!dets.length) {
+      summaryBox.innerHTML =
+        "Tidak ada objek terdeteksi pada frame terakhir. Coba ubah posisi kamera atau objek.";
+      detList.innerHTML = '<div class="empty-state">Tidak ada bounding box yang digambar.</div>';
+      setStatus({ live: cameraOn, text: "Deteksi selesai – tidak ada objek" });
+      lastTime.textContent = new Date().toLocaleTimeString();
+      return;
+    }
+
+    ctxOverlay.lineWidth = 3;
+    ctxOverlay.font = "14px system-ui";
+    ctxOverlay.textBaseline = "top";
+
+    detList.innerHTML = "";
+
+    const classCounter = {};
+    const colors = ["#22c55e", "#38bdf8", "#a855f7", "#f97316", "#e11d48"];
+
+    dets.forEach((det, idx) => {
+      const { class_name, confidence, x1, y1, x2, y2 } = det;
+      const label = class_name || "object";
+      const confPct = (confidence * 100).toFixed(1) + "%";
+
+      const color = colors[idx % colors.length];
+
+      const bw = x2 - x1;
+      const bh = y2 - y1;
+      ctxOverlay.strokeStyle = color;
+      ctxOverlay.fillStyle = "rgba(15,23,42,0.75)";
+      ctxOverlay.strokeRect(x1, y1, bw, bh);
+
+      const labelText = label + " " + confPct;
+      const textPaddingX = 4;
+      const textPaddingY = 2;
+      const textWidth = ctxOverlay.measureText(labelText).width + textPaddingX * 2;
+      const textHeight = 16 + textPaddingY * 2;
+
+      const tx = Math.max(x1, 0);
+      const ty = Math.max(y1 - textHeight, 0);
+
+      ctxOverlay.fillRect(tx, ty, textWidth, textHeight);
+      ctxOverlay.fillStyle = "#f9fafb";
+      ctxOverlay.fillText(labelText, tx + textPaddingX, ty + textPaddingY);
+
+      const row = document.createElement("div");
+      row.className = "det-row";
+      row.innerHTML = `
+        <div>
+          <div class="det-class">${label}</div>
+          <div class="det-box">[${x1.toFixed(0)}, ${y1.toFixed(0)} → ${x2.toFixed(0)}, ${y2.toFixed(0)}]</div>
+        </div>
+        <div class="det-conf">${confPct}</div>
+      `;
+      detList.appendChild(row);
+
+      classCounter[label] = (classCounter[label] || 0) + 1;
+    });
+
+    const total = dets.length;
+    const parts = Object.entries(classCounter).map(
+      ([cls, count]) => `${count} × <strong>${cls}</strong>`
+    );
+
+    summaryBox.innerHTML = `
+      Terdeteksi <strong>${total}</strong> objek dalam satu frame
+      (${parts.join(", ")}).<br/>
+      Latensi end-to-end: <strong>${latencyMs.toFixed(0)} ms</strong>.
+    `;
+
+    setStatus({ live: cameraOn, text: "Deteksi selesai – hasil ditampilkan di layar" });
+    lastTime.textContent = new Date().toLocaleTimeString();
+  }
+
+  btnCamera.addEventListener("click", () => startCamera());
+  btnDetect.addEventListener("click", captureAndDetect);
+  btnFrontCam.addEventListener("click", useFrontCamera);
+  btnBackCam.addEventListener("click", useBackCamera);
+
+  window.addEventListener("resize", () => {
+    if (cameraOn) resizeOverlayToVideo();
+  });
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setError("Browser ini belum mendukung akses kamera (getUserMedia). Coba gunakan Chrome atau Edge versi terbaru.");
+    btnCamera.disabled = true;
+    btnDetect.disabled = true;
+    btnFrontCam.disabled = true;
+    btnBackCam.disabled = true;
+    setStatus({ live: false, text: "Browser tidak mendukung kamera" });
+  }
+</script>
 </body>
 </html>
