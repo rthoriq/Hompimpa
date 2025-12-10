@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Realtime Object Detection Praktikum</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header>
+    <h1>Realtime Object Detection – Praktikum Computer Vision</h1>
+    <p>Backend: Hugging Face Spaces • Frontend: Vercel</p>
+  </header>
+
+  <main>
+    <section class="camera-section">
+      <div class="video-wrapper">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+      </div>
+
+      <div class="controls">
+        <button id="btnStartCamera">Start Kamera</button>
+        <button id="btnCapture" disabled>Capture & Deteksi</button>
+      </div>
+
+      <div id="status"></div>
+    </section>
+
+    <section class="result-section">
+      <h2>Hasil Deteksi</h2>
+      <pre id="rawJson"></pre>
+    </section>
+  </main>
+
+  <script src="./main.js"></script>
+</body>
+</html>
